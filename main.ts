@@ -1,7 +1,7 @@
 import fetch, { Response } from "node-fetch";
 import { map, mergeMap } from "rxjs/operators";
 import { get } from "./utils";
-import { of } from "rxjs";
+import { forkJoin, of } from "rxjs";
 
 /* 
 Read data from https://swapi.dev/api/people/1 (Luke Skywalker)
@@ -38,9 +38,7 @@ export interface PersonInfo {
   name: string;
   height: string;
   gender: "male" | "female" | "divers";
-  homeworld: {
-    name: string;
-  };
+  homeworld: string;
   films: {
     title: string;
     director: string;
@@ -66,7 +64,7 @@ export const getLukeSkywalkerInfo: PromiseBasedFunction = () => {
       name: person.name,
       height: person.height,
       gender: person.gender,
-      homeworld: {name : homeworld.name},
+      homeworld: homeworld.name,
       films: films.map((film) => ({
         title: film.title,
         director: film.director,
@@ -104,7 +102,7 @@ export const getLukeSkywalkerInfoAsync: PromiseBasedFunction = async () => {
     name: person.name,
     height: person.height,
     gender: person.gender,
-    homeworld: { name: homeworld.name },
+    homeworld: homeworld.name,
     films: films.map((film) => ({
       title: film.title,
       director: film.director,
@@ -120,8 +118,43 @@ export const getLukeSkywalkerInfoAsync: PromiseBasedFunction = async () => {
 export const getLukeSkywalkerInfoObservable = () => {
   return get<Person>("https://swapi.dev/api/people/1").pipe(
     mergeMap((person: Person) => {
+
+      // Fetch homeworld
+      const homeworld$ = get<{ name: string }>(person.homeworld).pipe(
+        map((homeworld) => homeworld.name)
+      );
+
+      
+
+
+      // fetch films
+      const films$ = forkJoin(
+        person.films.map((filmUrl) =>
+          get<{
+            title: string;
+            director: string;
+            release_date: string;
+          }>(filmUrl).pipe(
+            map((film) => ({
+              title: film.title,
+              director: film.director,
+              release_date: film.release_date,
+            }))
+          )
+        )
+      );
+
+
       // TODO: load other stuff and return LukeSkywalkerInfo
-      return of({} as PersonInfo);
+        return forkJoin([homeworld$, films$]).pipe(
+          map(([homeworld, films]) => ({
+            name: person.name,
+            height: person.height,
+            gender: person.gender,
+            homeworld,
+            films,
+          } as PersonInfo))
+      );
     })
   );
 };
