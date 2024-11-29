@@ -35,28 +35,85 @@ interface Person {
 }
 
 export interface PersonInfo {
-  // TODO: define type
+  name: string;
+  height: string;
+  gender: "male" | "female" | "divers";
+  homeworld: {
+    name: string;
+  };
+  films: {
+    title: string;
+    director: string;
+    release_date: string;
+  }[];
 }
+
 
 // Task 1: write a function using promise based fetch api
 type PromiseBasedFunction = () => Promise<PersonInfo>;
 export const getLukeSkywalkerInfo: PromiseBasedFunction = () => {
   return fetch("https://swapi.dev/api/people/1").then((response: Response) => {
     return response.json().then((person: Person) => {
-      // TODO: load other stuff and return LukeSkywalkerInfo
-      return {} as PersonInfo;
+      //Now we fetch homeworld from the first Person call
+        const homeworldPromis = fetch(person.homeworld).then((res) => res.json());
+        //And the films also from the first Person call
+        const filmsPromise = Promise.all(
+          person.films.map((filmURL: string) => fetch(filmURL).then((res)=> res.json()))
+  );
+
+  return Promise.all([homeworldPromis, filmsPromise]).then(([homeworld, films]) => {
+    return {
+      name: person.name,
+      height: person.height,
+      gender: person.gender,
+      homeworld: {name : homeworld.name},
+      films: films.map((film) => ({
+        title: film.title,
+        director: film.director,
+        release_date: film.release_date,
+          })),
+        } as PersonInfo;
+      });
     });
   });
 };
+
+
 
 // Task 2: write a function using async and await
 // see also: https://www.typescriptlang.org/docs/handbook/release-notes/typescript-1-7.html
 type AsyncBasedFunction = () => Promise<PersonInfo>;
 export const getLukeSkywalkerInfoAsync: PromiseBasedFunction = async () => {
   const response = await fetch("https://swapi.dev/api/people/1");
+  const person = await response.json();
+
+  // Fetch HomeWorld
+  const homeworldResponse = await fetch(person.homeworld);
+  const homeworld = await homeworldResponse.json();
+
+  // Fetch Movies
+  const films = await Promise.all(
+    person.films.map(async (filmUrl: string) =>{
+      const filmResponse = await fetch(filmUrl);
+      return await filmResponse.json();
+    })
+  );
+
   // TODO: load other stuff and return LukeSkywalkerInfo
-  return (await {}) as PersonInfo;
+  return (await {
+    name: person.name,
+    height: person.height,
+    gender: person.gender,
+    homeworld: { name: homeworld.name },
+    films: films.map((film) => ({
+      title: film.title,
+      director: film.director,
+      release_date: film.release_date,
+    })),    
+  }) as PersonInfo;
 };
+
+
 
 // Task 3: write a function using Observable based api
 // see also: https://rxjs.dev/api/index/function/forkJoin
